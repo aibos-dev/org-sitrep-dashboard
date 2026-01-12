@@ -84,6 +84,4 @@ org-sitrep-dashboard/
 - `GET /api/projects` - Get projects list
 - `POST /api/regenerate` - Regenerate all reports
 
-## License
 
-MIT
