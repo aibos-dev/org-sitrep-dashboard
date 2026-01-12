@@ -1,0 +1,10 @@
+{
+  "github": {
+    "owner": "aibos-dev",
+    "token": "ghp_YOUR_GITHUB_TOKEN_HERE"
+  },
+  "dashboard": {
+    "refresh_interval_minutes": 5,
+    "port": 8080
+  }
+}
