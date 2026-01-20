@@ -127,21 +127,54 @@ done
 ITEM_COUNT=$(echo "$ALL_ITEMS" | jq 'length')
 echo "  Fetched $ITEM_COUNT items across $PAGE_COUNT page(s)"
 
+# Fetch open PRs from org repositories
+echo "  Fetching open pull requests..."
+
+PR_QUERY='query($org: String!) {
+  organization(login: $org) {
+    repositories(first: 50, orderBy: {field: PUSHED_AT, direction: DESC}) {
+      nodes {
+        name
+        pullRequests(first: 50, states: OPEN) {
+          nodes {
+            number
+            title
+            url
+            createdAt
+            author { login }
+          }
+        }
+      }
+    }
+  }
+}'
+
+PR_DATA=$(gh api graphql -f query="$PR_QUERY" -f org="$OWNER" 2>/dev/null || echo "{}")
+ALL_PRS=$(echo "$PR_DATA" | jq '[.data.organization.repositories.nodes[]? | {repo: .name, prs: .pullRequests.nodes[]?} | {number: .prs.number, title: .prs.title, url: .prs.url, createdAt: .prs.createdAt, author: .prs.author.login, repository: .repo}] // []')
+PR_COUNT=$(echo "$ALL_PRS" | jq 'length')
+echo "  Fetched $PR_COUNT open pull requests"
+
 # Save items to temp file (avoid command line length limits)
 TEMP_FILE=$(mktemp)
 echo "$ALL_ITEMS" > "$TEMP_FILE"
 
+# Save PRs to temp file
+PR_TEMP_FILE=$(mktemp)
+echo "$ALL_PRS" > "$PR_TEMP_FILE"
+
 # Process and save as JSON for the dashboard
-python3 - "$TEMP_FILE" "$PROJECT_NAME" "$PROJECT_NUMBER" "$REPORT_FILE" << 'PYTHON_SCRIPT'
+python3 - "$TEMP_FILE" "$PROJECT_NAME" "$PROJECT_NUMBER" "$REPORT_FILE" "$PR_TEMP_FILE" << 'PYTHON_SCRIPT'
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 with open(sys.argv[1], 'r') as f:
     items = json.load(f)
 project_name = sys.argv[2]
 project_number = sys.argv[3]
 output_file = sys.argv[4]
+with open(sys.argv[5], 'r') as f:
+    prs = json.load(f)
 
 def get_status(item):
     for field in item.get('fieldValues', {}).get('nodes', []):
@@ -238,6 +271,25 @@ for item in items:
 resource_load = [{'assignee': f'@{k}', 'count': v}
                  for k, v in sorted(assignee_counts.items(), key=lambda x: -x[1])]
 
+# Assignee tasks (for drill-down)
+assignee_tasks = {}
+for item in items:
+    if item.get('content', {}).get('state') == 'CLOSED':
+        continue
+    status = get_status(item)
+    if status not in ['Done', 'On Hold']:
+        content = item.get('content', {})
+        for assignee in content.get('assignees', {}).get('nodes', []):
+            login = assignee['login']
+            if login not in assignee_tasks:
+                assignee_tasks[login] = []
+            assignee_tasks[login].append({
+                'number': content.get('number'),
+                'title': content.get('title'),
+                'url': content.get('url'),
+                'status': status
+            })
+
 # Issue details
 issue_details = {}
 if missing_assignee:
@@ -251,6 +303,31 @@ if missing_target:
 if missing_hours:
     issue_details['Missing Work Hours'] = missing_hours
 
+# Process PRs - check if late (>24 hours old)
+now = datetime.now(timezone.utc)
+open_prs = []
+for pr in prs:
+    if pr.get('createdAt'):
+        created = datetime.fromisoformat(pr['createdAt'].replace('Z', '+00:00'))
+        age_hours = (now - created).total_seconds() / 3600
+        is_late = age_hours > 24
+    else:
+        age_hours = 0
+        is_late = False
+    open_prs.append({
+        'number': pr.get('number'),
+        'title': pr.get('title'),
+        'url': pr.get('url'),
+        'author': pr.get('author'),
+        'repository': pr.get('repository'),
+        'createdAt': pr.get('createdAt'),
+        'ageHours': round(age_hours, 1),
+        'isLate': is_late
+    })
+
+# Sort by age (oldest first)
+open_prs.sort(key=lambda x: -x.get('ageHours', 0))
+
 # Build final report
 report = {
     'projectName': project_name,
@@ -263,7 +340,11 @@ report = {
     'healthCheck': health_check,
     'resourceLoad': resource_load,
     'epicRoadmap': epics,
-    'issueDetails': issue_details
+    'issueDetails': issue_details,
+    'assigneeTasks': assignee_tasks,
+    'openPRs': open_prs,
+    'totalOpenPRs': len(open_prs),
+    'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate'))
 }
 
 with open(output_file, 'w') as f:
@@ -272,7 +353,8 @@ with open(output_file, 'w') as f:
 print(f"  Report saved: {output_file}")
 PYTHON_SCRIPT
 
-# Clean up temp file
+# Clean up temp files
 rm -f "$TEMP_FILE"
+rm -f "$PR_TEMP_FILE"
 
 echo "  Done!"

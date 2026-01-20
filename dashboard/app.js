@@ -10,6 +10,7 @@ let refreshTimer = null;
 let nextRefreshTime = null;
 let allProjectsData = [];
 let currentProject = 'all';
+let currentProjectData = null;
 let isRegenerating = false;
 
 // Initialize dashboard
@@ -190,12 +191,16 @@ function updateOrgOverview(projects) {
 
 // Update single project dashboard
 function updateProjectDashboard(data) {
+    // Store current project data for modal access
+    currentProjectData = data;
+
     // Update summary cards
     document.getElementById('total-items').textContent = data.totalActiveItems || 0;
     document.getElementById('open-epics').textContent = data.totalOpenEpics || 0;
     document.getElementById('total-violations').textContent = data.totalViolations || 0;
     document.getElementById('team-members').textContent =
         data.resourceLoad ? data.resourceLoad.length : 0;
+    document.getElementById('open-prs').textContent = data.totalOpenPRs || 0;
 
     // Update health check
     updateHealthCheck(data.healthCheck || []);
@@ -208,6 +213,9 @@ function updateProjectDashboard(data) {
 
     // Update flagged issues
     updateFlaggedIssues(data.issueDetails || {});
+
+    // Update pull requests
+    updatePullRequests(data.openPRs || []);
 }
 
 // Health Check visualization
@@ -275,7 +283,8 @@ function updateResourceLoad(resourceData) {
         bubble.style.height = `${size}px`;
         bubble.style.background = color;
         bubble.textContent = item.count;
-        bubble.title = `${item.assignee}: ${item.count} issues`;
+        bubble.title = `${item.assignee}: ${item.count} issues - Click to view tasks`;
+        bubble.onclick = () => showAssigneeTasks(item.assignee);
         chartContainer.appendChild(bubble);
 
         const loadClass = item.count <= 3 ? 'load-low' :
@@ -289,6 +298,9 @@ function updateResourceLoad(resourceData) {
             <td><strong>${item.count}</strong></td>
             <td><span class="load-indicator ${loadClass}">${loadText}</span></td>
         `;
+        row.style.cursor = 'pointer';
+        row.title = 'Click to view tasks';
+        row.onclick = () => showAssigneeTasks(item.assignee);
         tableBody.appendChild(row);
     });
 
@@ -479,4 +491,117 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.classList.add('hidden');
     }, 3000);
+}
+
+// Assignee Tasks Modal
+function showAssigneeTasks(assignee) {
+    if (!currentProjectData || !currentProjectData.assigneeTasks) {
+        showToast('No task data available', 'error');
+        return;
+    }
+
+    // Remove @ prefix if present for lookup
+    const login = assignee.startsWith('@') ? assignee.slice(1) : assignee;
+    const tasks = currentProjectData.assigneeTasks[login] || [];
+
+    const modal = document.getElementById('assignee-modal');
+    const nameElement = document.getElementById('modal-assignee-name');
+    const tasksList = document.getElementById('modal-tasks-list');
+
+    nameElement.textContent = `@${login}`;
+
+    if (tasks.length === 0) {
+        tasksList.innerHTML = '<p class="no-data">No active tasks found</p>';
+    } else {
+        let html = '<div class="task-list">';
+        tasks.forEach(task => {
+            const statusClass = task.status === 'In Progress' ? 'in-progress' :
+                               task.status === 'Todo' ? 'todo' : 'other';
+            html += `
+                <div class="task-item">
+                    <a href="${task.url}" target="_blank" class="task-link">
+                        <span class="task-number">#${task.number}</span>
+                        <span class="task-title">${task.title}</span>
+                    </a>
+                    <span class="task-status ${statusClass}">${task.status}</span>
+                </div>
+            `;
+        });
+        html += '</div>';
+        tasksList.innerHTML = html;
+    }
+
+    modal.classList.remove('hidden');
+
+    // Close on backdrop click
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeAssigneeModal();
+        }
+    };
+}
+
+function closeAssigneeModal() {
+    const modal = document.getElementById('assignee-modal');
+    modal.classList.add('hidden');
+}
+
+// Pull Requests visualization
+function updatePullRequests(prData) {
+    const container = document.getElementById('pr-content');
+
+    if (!prData || prData.length === 0) {
+        container.innerHTML = '<p class="no-data">No open pull requests</p>';
+        return;
+    }
+
+    let html = `
+        <table class="pr-table">
+            <thead>
+                <tr>
+                    <th>PR</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Repository</th>
+                    <th>Age</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    prData.forEach(pr => {
+        const ageDisplay = formatAge(pr.ageHours);
+        const lateClass = pr.isLate ? 'pr-late' : '';
+        const lateBadge = pr.isLate ? '<span class="late-badge">LATE</span>' : '<span class="ok-badge">OK</span>';
+
+        html += `
+            <tr class="${lateClass}">
+                <td><a href="${pr.url}" target="_blank">#${pr.number}</a></td>
+                <td class="pr-title">${pr.title}</td>
+                <td>@${pr.author || 'unknown'}</td>
+                <td>${pr.repository || '-'}</td>
+                <td class="pr-age">${ageDisplay}</td>
+                <td>${lateBadge}</td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function formatAge(hours) {
+    if (hours < 1) {
+        return '< 1h';
+    } else if (hours < 24) {
+        return `${Math.round(hours)}h`;
+    } else {
+        const days = Math.floor(hours / 24);
+        const remainingHours = Math.round(hours % 24);
+        if (remainingHours === 0) {
+            return `${days}d`;
+        }
+        return `${days}d ${remainingHours}h`;
+    }
 }

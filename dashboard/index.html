@@ -133,6 +133,20 @@
                         <p class="card-value" id="team-members">--</p>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-icon pr">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="18" r="3"/>
+                            <circle cx="6" cy="6" r="3"/>
+                            <path d="M13 6h3a2 2 0 012 2v7"/>
+                            <line x1="6" y1="9" x2="6" y2="21"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Open PRs</h3>
+                        <p class="card-value" id="open-prs">--</p>
+                    </div>
+                </div>
             </div>
 
             <div class="dashboard-grid">
@@ -182,6 +196,13 @@
                     <p class="no-data">Loading issue details...</p>
                 </div>
             </section>
+
+            <section class="panel pr-panel">
+                <h2>Open Pull Requests</h2>
+                <div id="pr-content">
+                    <p class="no-data">Loading pull request data...</p>
+                </div>
+            </section>
         </section>
 
         <footer>
@@ -199,6 +220,17 @@
     </div>
 
     <div id="toast" class="toast hidden"></div>
+
+    <!-- Assignee Tasks Modal -->
+    <div id="assignee-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-assignee-name">@username</h2>
+                <button class="modal-close" onclick="closeAssigneeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-tasks-list"></div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
