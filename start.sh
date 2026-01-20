@@ -32,15 +32,6 @@ if [ ! -f "$SCRIPT_DIR/config.json" ]; then
     echo "Please copy config.sample.json to config.json and configure it."
 fi
 
-# Fetch initial data before starting the server
-echo "Fetching initial project data..."
-if [ -f "$SCRIPT_DIR/scripts/fetch_all_projects.sh" ]; then
-    bash "$SCRIPT_DIR/scripts/fetch_all_projects.sh"
-    echo "Initial data fetch complete."
-else
-    echo "Warning: fetch_all_projects.sh not found. Starting without initial data."
-fi
-
 # Start the server
 cd "$SCRIPT_DIR/dashboard"
 python3 server.py
