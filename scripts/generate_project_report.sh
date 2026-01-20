@@ -166,6 +166,7 @@ echo "$ALL_PRS" > "$PR_TEMP_FILE"
 python3 - "$TEMP_FILE" "$PROJECT_NAME" "$PROJECT_NUMBER" "$REPORT_FILE" "$PR_TEMP_FILE" << 'PYTHON_SCRIPT'
 import json
 import sys
+import re
 from datetime import datetime, timezone
 
 with open(sys.argv[1], 'r') as f:
@@ -175,6 +176,15 @@ project_number = sys.argv[3]
 output_file = sys.argv[4]
 with open(sys.argv[5], 'r') as f:
     prs = json.load(f)
+
+# Extract repository names from project issues
+project_repos = set()
+for item in items:
+    url = item.get('content', {}).get('url', '')
+    # Extract repo name from URL like https://github.com/org/repo/issues/123
+    match = re.search(r'github\.com/[^/]+/([^/]+)/', url)
+    if match:
+        project_repos.add(match.group(1))
 
 def get_status(item):
     for field in item.get('fieldValues', {}).get('nodes', []):
@@ -303,10 +313,14 @@ if missing_target:
 if missing_hours:
     issue_details['Missing Work Hours'] = missing_hours
 
-# Process PRs - check if late (>24 hours old)
+# Process PRs - filter by project repos and check if late (>24 hours old)
 now = datetime.now(timezone.utc)
 open_prs = []
 for pr in prs:
+    # Only include PRs from repositories that have issues in this project
+    if pr.get('repository') not in project_repos:
+        continue
+
     if pr.get('createdAt'):
         created = datetime.fromisoformat(pr['createdAt'].replace('Z', '+00:00'))
         age_hours = (now - created).total_seconds() / 3600
