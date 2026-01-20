@@ -4,12 +4,14 @@ A real-time dashboard for monitoring all GitHub Projects across an organization.
 
 ## Features
 
-- **Organization Overview**: View all projects at a glance with key metrics
+- **Organization Overview**: View all projects at a glance with key metrics (active items, epics, violations, team members, open PRs)
 - **Project Details**: Drill down into individual project data
 - **Health Check**: Track missing assignees, statuses, dates, and work hours
-- **Resource Load**: Monitor team member workload distribution
+- **Resource Load**: Monitor team member workload distribution with clickable drill-down to view individual tasks
 - **Epic Roadmap**: View open epics and their progress
+- **Pull Request Tracking**: Monitor open PRs per project with age indicators and late PR alerts (>24 hours)
 - **Auto-Refresh**: Dashboard updates every 5 minutes automatically
+- **Auto-Load on Start**: Reports are automatically loaded when the server starts
 
 ## Requirements
 
@@ -25,17 +27,13 @@ A real-time dashboard for monitoring all GitHub Projects across an organization.
    # Edit config.json with your GitHub token
    ```
 
-2. **Generate initial reports**:
-   ```bash
-   ./scripts/fetch_all_projects.sh
-   ```
-
-3. **Start the dashboard**:
+2. **Start the dashboard**:
    ```bash
    ./start.sh
    ```
+   Reports are automatically loaded on server start.
 
-4. **Open in browser**: http://localhost:8080
+3. **Open in browser**: http://localhost:8080
 
 ## Configuration
 
