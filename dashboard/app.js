@@ -132,6 +132,7 @@ function updateOrgOverview(projects) {
     // Calculate totals
     const totalItems = projects.reduce((sum, p) => sum + (p.totalActiveItems || 0), 0);
     const totalViolations = projects.reduce((sum, p) => sum + (p.totalViolations || 0), 0);
+    const totalPRs = projects.reduce((sum, p) => sum + (p.totalOpenPRs || 0), 0);
 
     // Get unique team members
     const allMembers = new Set();
@@ -144,6 +145,7 @@ function updateOrgOverview(projects) {
     document.getElementById('org-total-items').textContent = totalItems;
     document.getElementById('org-total-violations').textContent = totalViolations;
     document.getElementById('org-team-members').textContent = allMembers.size;
+    document.getElementById('org-total-prs').textContent = totalPRs;
 
     // Build project cards
     const grid = document.getElementById('projects-grid');
@@ -159,6 +161,9 @@ function updateOrgOverview(projects) {
         };
 
         const violationClass = project.totalViolations > 0 ? 'violations' : 'healthy';
+
+        const prCount = project.totalOpenPRs || 0;
+        const prClass = prCount > 0 ? 'has-prs' : '';
 
         card.innerHTML = `
             <div class="project-card-header">
@@ -177,6 +182,10 @@ function updateOrgOverview(projects) {
                 <div class="project-stat ${violationClass}">
                     <div class="project-stat-value">${project.totalViolations || 0}</div>
                     <div class="project-stat-label">Violations</div>
+                </div>
+                <div class="project-stat ${prClass}">
+                    <div class="project-stat-value">${prCount}</div>
+                    <div class="project-stat-label">Open PRs</div>
                 </div>
             </div>
         `;

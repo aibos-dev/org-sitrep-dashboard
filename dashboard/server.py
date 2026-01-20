@@ -185,6 +185,15 @@ def run_server():
     print(f"  API Data:     http://localhost:{port}/api/data")
     print(f"  Reports:      {REPORTS_DIR}")
     print(f"{'='*55}")
+
+    # Fetch initial data on server start
+    print("\n  Loading initial reports...")
+    result = regenerate_all_reports()
+    if result.get("success"):
+        print("  Initial reports loaded successfully.")
+    else:
+        print(f"  Warning: Failed to load initial reports: {result.get('error', 'Unknown error')}")
+
     print("\n  Press Ctrl+C to stop the server\n")
 
     with http.server.HTTPServer(("", port), DashboardHandler) as httpd:
