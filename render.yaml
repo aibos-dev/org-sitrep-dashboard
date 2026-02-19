@@ -10,3 +10,5 @@ services:
         sync: false
       - key: GITHUB_OWNER
         sync: false
+      - key: DASHBOARD_PASSCODE
+        sync: false
