@@ -88,7 +88,8 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 active_sessions.add(token)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"session_token={token}; Path=/; HttpOnly; SameSite=Strict")
+                secure_flag = "; Secure" if os.environ.get("RENDER") else ""
+                self.send_header("Set-Cookie", f"session_token={token}; Path=/; HttpOnly; SameSite=Lax{secure_flag}")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": True}).encode())
             else:
