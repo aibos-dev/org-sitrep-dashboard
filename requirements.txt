@@ -1,0 +1,2 @@
+# No external Python dependencies required.
+# This file exists for Render to detect the app as a Python service.

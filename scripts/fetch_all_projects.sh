@@ -12,22 +12,23 @@ OUTPUT_DIR="${PROJECT_DIR}/reports"
 DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H-%M-%S)
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: config.json not found. Please create it from config.sample.json"
-    exit 1
+# Support environment variables with fallback to config.json
+OWNER="${GITHUB_OWNER:-}"
+TOKEN="${GH_TOKEN:-}"
+
+if [ -f "$CONFIG_FILE" ]; then
+    [ -z "$OWNER" ] && OWNER=$(jq -r '.github.owner // empty' "$CONFIG_FILE")
+    [ -z "$TOKEN" ] && TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
 fi
 
-OWNER=$(jq -r '.github.owner' "$CONFIG_FILE")
-GITHUB_TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
-
 if [ -z "$OWNER" ]; then
-    echo "Error: Missing 'owner' in config.json"
+    echo "Error: Missing GitHub owner. Set GITHUB_OWNER env var or 'owner' in config.json"
     exit 1
 fi
 
 # Set up GitHub token
-if [ ! -z "$GITHUB_TOKEN" ]; then
-    export GH_TOKEN="$GITHUB_TOKEN"
+if [ -n "$TOKEN" ]; then
+    export GH_TOKEN="$TOKEN"
 fi
 
 mkdir -p "$OUTPUT_DIR"
@@ -88,6 +89,29 @@ echo ""
 
 # Save project list to JSON for the dashboard
 echo "$PROJECTS_DATA" | jq '[.data.organization.projectsV2.nodes[] | select(.closed == false) | {number, title, description: .shortDescription, itemCount: .items.totalCount}]' > "$OUTPUT_DIR/projects.json"
+
+# Fetch organization members
+echo "Fetching organization members..."
+MEMBERS_QUERY='query($org: String!) {
+  organization(login: $org) {
+    membersWithRole(first: 100) {
+      nodes {
+        login
+      }
+    }
+  }
+}'
+
+MEMBERS_DATA=$(gh api graphql -f query="$MEMBERS_QUERY" -f org="$OWNER" 2>&1)
+if echo "$MEMBERS_DATA" | jq -e '.data.organization.membersWithRole' > /dev/null 2>&1; then
+    echo "$MEMBERS_DATA" | jq '[.data.organization.membersWithRole.nodes[].login]' > "$OUTPUT_DIR/members.json"
+    MEMBER_COUNT=$(jq 'length' "$OUTPUT_DIR/members.json")
+    echo "  Found $MEMBER_COUNT organization members"
+else
+    echo "  Warning: Could not fetch org members (may require admin scope). Falling back to empty list."
+    echo "[]" > "$OUTPUT_DIR/members.json"
+fi
+echo ""
 
 # Process each project in parallel
 MAX_PARALLEL=4  # Maximum concurrent jobs

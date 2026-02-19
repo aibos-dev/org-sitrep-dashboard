@@ -21,11 +21,17 @@ OUTPUT_DIR="${PROJECT_DIR}/reports"
 DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H-%M-%S)
 
-OWNER=$(jq -r '.github.owner' "$CONFIG_FILE")
-GITHUB_TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
+# Support environment variables with fallback to config.json
+OWNER="${GITHUB_OWNER:-}"
+TOKEN="${GH_TOKEN:-}"
 
-if [ ! -z "$GITHUB_TOKEN" ]; then
-    export GH_TOKEN="$GITHUB_TOKEN"
+if [ -f "$CONFIG_FILE" ]; then
+    [ -z "$OWNER" ] && OWNER=$(jq -r '.github.owner // empty' "$CONFIG_FILE")
+    [ -z "$TOKEN" ] && TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
+fi
+
+if [ -n "$TOKEN" ]; then
+    export GH_TOKEN="$TOKEN"
 fi
 
 mkdir -p "$OUTPUT_DIR"
@@ -267,19 +273,32 @@ health_check = [
     {'metric': 'Missing Work Hours', 'count': len(missing_hours), 'description': f'{len(missing_hours)} issues'}
 ]
 
-# Resource load
+# Collect all project members (anyone ever assigned to any item, including closed)
+all_project_members = set()
+for item in items:
+    for assignee in item.get('content', {}).get('assignees', {}).get('nodes', []):
+        all_project_members.add(assignee['login'])
+
+# Resource load (active items only)
 assignee_counts = {}
+unassigned_count = 0
 for item in items:
     if item.get('content', {}).get('state') == 'CLOSED':
         continue
     status = get_status(item)
     if status not in ['Done', 'On Hold']:
-        for assignee in item.get('content', {}).get('assignees', {}).get('nodes', []):
+        assignees = item.get('content', {}).get('assignees', {}).get('nodes', [])
+        if not assignees:
+            unassigned_count += 1
+        for assignee in assignees:
             login = assignee['login']
             assignee_counts[login] = assignee_counts.get(login, 0) + 1
 
 resource_load = [{'assignee': f'@{k}', 'count': v}
                  for k, v in sorted(assignee_counts.items(), key=lambda x: -x[1])]
+
+# Idle members: project members with zero active tasks
+idle_members = sorted(all_project_members - set(assignee_counts.keys()))
 
 # Assignee tasks (for drill-down)
 assignee_tasks = {}
@@ -289,7 +308,17 @@ for item in items:
     status = get_status(item)
     if status not in ['Done', 'On Hold']:
         content = item.get('content', {})
-        for assignee in content.get('assignees', {}).get('nodes', []):
+        assignees = content.get('assignees', {}).get('nodes', [])
+        if not assignees:
+            if '_unassigned' not in assignee_tasks:
+                assignee_tasks['_unassigned'] = []
+            assignee_tasks['_unassigned'].append({
+                'number': content.get('number'),
+                'title': content.get('title'),
+                'url': content.get('url'),
+                'status': status
+            })
+        for assignee in assignees:
             login = assignee['login']
             if login not in assignee_tasks:
                 assignee_tasks[login] = []
@@ -342,6 +371,111 @@ for pr in prs:
 # Sort by age (oldest first)
 open_prs.sort(key=lambda x: -x.get('ageHours', 0))
 
+# --- Overdue Items ---
+now_date = datetime.now().date()
+overdue_items = []
+for item in open_items:
+    content = item.get('content', {})
+    url = content.get('url', '')
+    if not url:
+        continue
+    fields = {field.get('field', {}).get('name', ''): field
+              for field in item.get('fieldValues', {}).get('nodes', [])}
+    target_date_field = fields.get('Target Date')
+    if target_date_field:
+        target_date_str = target_date_field.get('date', '')
+        if target_date_str:
+            try:
+                target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
+                if target_date < now_date:
+                    days_overdue = (now_date - target_date).days
+                    assignees = [a['login'] for a in content.get('assignees', {}).get('nodes', [])]
+                    overdue_items.append({
+                        'number': content.get('number', ''),
+                        'title': content.get('title', ''),
+                        'url': url,
+                        'targetDate': target_date_str,
+                        'daysOverdue': days_overdue,
+                        'assignees': ', '.join(assignees) if assignees else 'Unassigned',
+                        'status': get_status(item)
+                    })
+            except ValueError:
+                pass
+overdue_items.sort(key=lambda x: -x['daysOverdue'])
+
+# --- Status Distribution (all items including closed) ---
+status_counts = {}
+for item in items:
+    if item.get('content', {}).get('state') == 'CLOSED':
+        status_key = 'Done'
+    else:
+        status_key = get_status(item)
+    status_counts[status_key] = status_counts.get(status_key, 0) + 1
+status_distribution = [{'status': k, 'count': v}
+                       for k, v in sorted(status_counts.items(), key=lambda x: -x[1])]
+
+# --- Aging WIP (In Progress items with duration) ---
+aging_wip = []
+for item in open_items:
+    status = get_status(item)
+    if status != 'In Progress':
+        continue
+    content = item.get('content', {})
+    url = content.get('url', '')
+    if not url:
+        continue
+    fields = {field.get('field', {}).get('name', ''): field
+              for field in item.get('fieldValues', {}).get('nodes', [])}
+    start_date_field = fields.get('Start Date')
+    days_in_progress = None
+    start_date_str = ''
+    if start_date_field:
+        start_date_str = start_date_field.get('date', '')
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                days_in_progress = (now_date - start_date).days
+            except ValueError:
+                pass
+    assignees = [a['login'] for a in content.get('assignees', {}).get('nodes', [])]
+    aging_wip.append({
+        'number': content.get('number', ''),
+        'title': content.get('title', ''),
+        'url': url,
+        'startDate': start_date_str,
+        'daysInProgress': days_in_progress,
+        'assignees': ', '.join(assignees) if assignees else 'Unassigned'
+    })
+aging_wip.sort(key=lambda x: -(x['daysInProgress'] if x['daysInProgress'] is not None else -1))
+
+# --- Risk Score (0-100, weighted composite) ---
+total_active = max(len(open_items), 1)
+violation_ratio = min(sum(h['count'] for h in health_check) / total_active, 1.0)
+overdue_ratio = min(len(overdue_items) / total_active, 1.0)
+unassigned_ratio = min(unassigned_count / total_active, 1.0)
+idle_ratio = len(idle_members) / max(len(all_project_members), 1)
+late_pr_ratio = sum(1 for pr in open_prs if pr.get('isLate')) / max(len(open_prs), 1)
+aging_severe_count = sum(1 for w in aging_wip if w['daysInProgress'] is not None and w['daysInProgress'] > 14)
+aging_severe_ratio = min(aging_severe_count / total_active, 1.0)
+
+risk_score = min(100, round(
+    violation_ratio * 25 +
+    overdue_ratio * 30 +
+    unassigned_ratio * 15 +
+    idle_ratio * 10 +
+    late_pr_ratio * 10 +
+    aging_severe_ratio * 10
+))
+
+if risk_score <= 15:
+    risk_level = 'Low'
+elif risk_score <= 40:
+    risk_level = 'Medium'
+elif risk_score <= 70:
+    risk_level = 'High'
+else:
+    risk_level = 'Critical'
+
 # Build final report
 report = {
     'projectName': project_name,
@@ -358,7 +492,17 @@ report = {
     'assigneeTasks': assignee_tasks,
     'openPRs': open_prs,
     'totalOpenPRs': len(open_prs),
-    'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate'))
+    'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate')),
+    'unassignedItems': unassigned_count,
+    'projectMembers': sorted(all_project_members),
+    'idleMembers': idle_members,
+    'overdueItems': overdue_items,
+    'totalOverdueItems': len(overdue_items),
+    'statusDistribution': status_distribution,
+    'agingWIP': aging_wip,
+    'totalAgingWIP': len([w for w in aging_wip if w['daysInProgress'] is not None and w['daysInProgress'] > 7]),
+    'riskScore': risk_score,
+    'riskLevel': risk_level
 }
 
 with open(output_file, 'w') as f:

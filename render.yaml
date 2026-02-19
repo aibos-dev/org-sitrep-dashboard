@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: org-sitrep-dashboard
+    runtime: python
+    buildCommand: bash build.sh
+    startCommand: bash start.sh
+    healthCheckPath: /health
+    envVars:
+      - key: GH_TOKEN
+        sync: false
+      - key: GITHUB_OWNER
+        sync: false
+      - key: DASHBOARD_PASSCODE
+        sync: false

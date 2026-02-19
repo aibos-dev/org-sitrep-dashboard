@@ -7,7 +7,26 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Passcode Gate -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+            </div>
+            <h2>Organization SitRep Dashboard</h2>
+            <p class="auth-subtitle">Enter passcode to continue</p>
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <input type="password" id="passcode-input" placeholder="Passcode" autocomplete="off" required>
+                <button type="submit" id="auth-btn">Unlock</button>
+            </form>
+            <p id="auth-error" class="auth-error hidden">Invalid passcode. Try again.</p>
+        </div>
+    </div>
+
+    <div class="container hidden" id="dashboard-container">
         <header>
             <h1>Organization SitRep Dashboard</h1>
             <div class="header-controls">
@@ -27,74 +46,22 @@
 
         <!-- Organization Overview (shown when "All Projects" selected) -->
         <section id="org-overview" class="org-overview">
-            <h2>Organization Overview</h2>
-            <div class="org-summary-cards">
-                <div class="card">
-                    <div class="card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
-                        </svg>
-                    </div>
-                    <div class="card-content">
-                        <h3>Total Projects</h3>
-                        <p class="card-value" id="total-projects">--</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                    </div>
-                    <div class="card-content">
-                        <h3>Total Active Items</h3>
-                        <p class="card-value" id="org-total-items">--</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon warning">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                    </div>
-                    <div class="card-content">
-                        <h3>Total Violations</h3>
-                        <p class="card-value" id="org-total-violations">--</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon success">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 010 7.75"/>
-                        </svg>
-                    </div>
-                    <div class="card-content">
-                        <h3>Team Members</h3>
-                        <p class="card-value" id="org-team-members">--</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon pr">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="18" cy="18" r="3"/>
-                            <circle cx="6" cy="6" r="3"/>
-                            <path d="M13 6h3a2 2 0 012 2v7"/>
-                            <line x1="6" y1="9" x2="6" y2="21"/>
-                        </svg>
-                    </div>
-                    <div class="card-content">
-                        <h3>Total Open PRs</h3>
-                        <p class="card-value" id="org-total-prs">--</p>
-                    </div>
+            <div class="org-header">
+                <h2>Organization Overview</h2>
+                <div class="project-search">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="project-search" placeholder="Search projects..." autocomplete="off">
                 </div>
             </div>
-
-            <div class="projects-grid" id="projects-grid">
-                <!-- Project cards will be inserted here -->
-            </div>
+            <!-- Cross-Project Summary Table -->
+            <section class="panel cross-project-panel">
+                <h2>Cross-Project Summary</h2>
+                <div id="cross-project-content">
+                    <p class="no-data">Loading project data...</p>
+                </div>
+            </section>
         </section>
 
         <!-- Single Project View (shown when specific project selected) -->
@@ -161,6 +128,29 @@
                         <p class="card-value" id="open-prs">--</p>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-icon overdue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Overdue Items</h3>
+                        <p class="card-value" id="project-overdue">--</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon risk-card-icon" id="risk-card">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Risk Level</h3>
+                        <p class="card-value" id="project-risk-level">--</p>
+                    </div>
+                </div>
             </div>
 
             <div class="dashboard-grid">
@@ -194,8 +184,34 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                    <div id="idle-members-section" class="idle-members-section hidden">
+                        <h3>Idle Members</h3>
+                        <div id="idle-members-list" class="idle-members-list"></div>
+                    </div>
                 </section>
             </div>
+
+            <div class="dashboard-grid">
+                <section class="panel status-panel">
+                    <h2>Status Distribution</h2>
+                    <div id="status-chart"></div>
+                    <div id="status-legend" class="status-legend"></div>
+                </section>
+
+                <section class="panel overdue-panel">
+                    <h2>Overdue Items</h2>
+                    <div id="overdue-content">
+                        <p class="no-data">Loading overdue data...</p>
+                    </div>
+                </section>
+            </div>
+
+            <section class="panel aging-panel">
+                <h2>Aging Work in Progress</h2>
+                <div id="aging-content">
+                    <p class="no-data">Loading aging WIP data...</p>
+                </div>
+            </section>
 
             <section class="panel epic-panel">
                 <h2>Epic Roadmap</h2>
@@ -246,6 +262,43 @@
         </div>
     </div>
 
+    <script>
+    async function handleAuth(e) {
+        e.preventDefault();
+        const input = document.getElementById('passcode-input');
+        const error = document.getElementById('auth-error');
+        const btn = document.getElementById('auth-btn');
+
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+        error.classList.add('hidden');
+
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ passcode: input.value })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('dashboard-container').classList.remove('hidden');
+                initDashboard();
+            } else {
+                error.classList.remove('hidden');
+                input.value = '';
+                input.focus();
+            }
+        } catch (err) {
+            error.textContent = 'Connection error. Try again.';
+            error.classList.remove('hidden');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+    }
+    </script>
     <script src="app.js"></script>
 </body>
 </html>
