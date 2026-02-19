@@ -13,6 +13,23 @@ let currentProject = 'all';
 let currentProjectData = null;
 let isRegenerating = false;
 
+// Authenticated fetch wrapper — redirects to login on 401
+async function authFetch(url, options = {}) {
+    const response = await fetch(url, options);
+    if (response.status === 401) {
+        showToast('Session expired. Redirecting to login...', 'error');
+        if (refreshTimer) clearInterval(refreshTimer);
+        setTimeout(() => {
+            document.getElementById('dashboard-container').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('passcode-input').value = '';
+            document.getElementById('passcode-input').focus();
+        }, 1000);
+        throw new Error('Session expired');
+    }
+    return response;
+}
+
 // Initialize dashboard (called after successful authentication)
 function initDashboard() {
     setupEventListeners();
@@ -90,10 +107,7 @@ function updateRefreshCountdown() {
 async function refreshData() {
     showToast('Refreshing data...', 'info');
     try {
-        const response = await fetch(CONFIG.apiEndpoint);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await authFetch(CONFIG.apiEndpoint);
         const data = await response.json();
         allProjectsData = data.projects || [];
 
@@ -687,10 +701,7 @@ async function regenerateReports(autoTriggered = false) {
     }, 600);
 
     try {
-        const response = await fetch(CONFIG.regenerateEndpoint, { method: 'POST' });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const response = await authFetch(CONFIG.regenerateEndpoint, { method: 'POST' });
         const result = await response.json();
 
         clearInterval(progressInterval);
