@@ -267,7 +267,7 @@ header h1 {
 
 .project-card-stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 15px;
 }
 
@@ -292,6 +292,10 @@ header h1 {
 
 .project-stat.healthy .project-stat-value {
     color: var(--accent-green);
+}
+
+.project-stat.unassigned .project-stat-value {
+    color: #94a3b8;
 }
 
 /* Summary Cards */
@@ -345,6 +349,10 @@ header h1 {
 
 .card-icon.success {
     background: var(--accent-green);
+}
+
+.card-icon.unassigned {
+    background: #64748b;
 }
 
 .card-content h3 {
@@ -514,6 +522,11 @@ header h1 {
 .load-high {
     background: rgba(239, 68, 68, 0.2);
     color: var(--accent-red);
+}
+
+.load-unassigned {
+    background: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
 }
 
 /* Epic Panel */
