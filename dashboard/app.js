@@ -147,6 +147,7 @@ function updateOrgOverview(projects) {
     const totalItems = projects.reduce((sum, p) => sum + (p.totalActiveItems || 0), 0);
     const totalViolations = projects.reduce((sum, p) => sum + (p.totalViolations || 0), 0);
     const totalPRs = projects.reduce((sum, p) => sum + (p.totalOpenPRs || 0), 0);
+    const totalUnassigned = projects.reduce((sum, p) => sum + (p.unassignedItems || 0), 0);
 
     // Get unique team members
     const allMembers = new Set();
@@ -160,6 +161,7 @@ function updateOrgOverview(projects) {
     document.getElementById('org-total-violations').textContent = totalViolations;
     document.getElementById('org-team-members').textContent = allMembers.size;
     document.getElementById('org-total-prs').textContent = totalPRs;
+    document.getElementById('org-total-unassigned').textContent = totalUnassigned;
 
     // Build project cards
     const grid = document.getElementById('projects-grid');
@@ -178,6 +180,8 @@ function updateOrgOverview(projects) {
 
         const prCount = project.totalOpenPRs || 0;
         const prClass = prCount > 0 ? 'has-prs' : '';
+        const unassignedCount = project.unassignedItems || 0;
+        const unassignedClass = unassignedCount > 0 ? 'unassigned' : '';
 
         card.innerHTML = `
             <div class="project-card-header">
@@ -200,6 +204,10 @@ function updateOrgOverview(projects) {
                 <div class="project-stat ${prClass}">
                     <div class="project-stat-value">${prCount}</div>
                     <div class="project-stat-label">Open PRs</div>
+                </div>
+                <div class="project-stat ${unassignedClass}">
+                    <div class="project-stat-value">${unassignedCount}</div>
+                    <div class="project-stat-label">Unassigned</div>
                 </div>
             </div>
         `;
@@ -229,7 +237,7 @@ function updateProjectDashboard(data) {
     updateHealthCheck(data.healthCheck || []);
 
     // Update resource load
-    updateResourceLoad(data.resourceLoad || []);
+    updateResourceLoad(data.resourceLoad || [], data.unassignedItems || 0);
 
     // Update epic roadmap
     updateEpicRoadmap(data.epicRoadmap || []);
@@ -281,13 +289,18 @@ function updateHealthCheck(healthData) {
 }
 
 // Resource Load visualization
-function updateResourceLoad(resourceData) {
+function updateResourceLoad(resourceData, unassignedCount = 0) {
     const chartContainer = document.getElementById('resource-chart');
     const tableBody = document.querySelector('#resource-table tbody');
 
     resourceData.sort((a, b) => b.count - a.count);
 
-    const maxCount = Math.max(...resourceData.map(r => r.count), 1);
+    const allData = [...resourceData];
+    if (unassignedCount > 0) {
+        allData.push({ assignee: 'Unassigned', count: unassignedCount });
+    }
+
+    const maxCount = Math.max(...allData.map(r => r.count), 1);
 
     const colors = [
         '#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7',
@@ -297,22 +310,29 @@ function updateResourceLoad(resourceData) {
     chartContainer.innerHTML = '';
     tableBody.innerHTML = '';
 
-    resourceData.forEach((item, index) => {
+    allData.forEach((item, index) => {
+        const isUnassigned = item.assignee === 'Unassigned';
         const size = 30 + (item.count / maxCount) * 40;
-        const color = colors[index % colors.length];
+        const color = isUnassigned ? '#94a3b8' : colors[index % colors.length];
         const bubble = document.createElement('div');
-        bubble.className = 'resource-bubble';
+        bubble.className = 'resource-bubble' + (isUnassigned ? ' unassigned-bubble' : '');
         bubble.style.width = `${size}px`;
         bubble.style.height = `${size}px`;
         bubble.style.background = color;
         bubble.textContent = item.count;
-        bubble.title = `${item.assignee}: ${item.count} issues - Click to view tasks`;
-        bubble.onclick = () => showAssigneeTasks(item.assignee);
+        bubble.title = `${item.assignee}: ${item.count} issues` + (isUnassigned ? '' : ' - Click to view tasks');
+        if (!isUnassigned) {
+            bubble.onclick = () => showAssigneeTasks(item.assignee);
+        } else {
+            bubble.onclick = () => showAssigneeTasks('_unassigned');
+        }
         chartContainer.appendChild(bubble);
 
-        const loadClass = item.count <= 3 ? 'load-low' :
+        const loadClass = isUnassigned ? 'load-unassigned' :
+                         item.count <= 3 ? 'load-low' :
                          item.count <= 6 ? 'load-medium' : 'load-high';
-        const loadText = item.count <= 3 ? 'Low' :
+        const loadText = isUnassigned ? 'Unassigned' :
+                        item.count <= 3 ? 'Low' :
                         item.count <= 6 ? 'Medium' : 'High';
 
         const row = document.createElement('tr');
@@ -322,12 +342,12 @@ function updateResourceLoad(resourceData) {
             <td><span class="load-indicator ${loadClass}">${loadText}</span></td>
         `;
         row.style.cursor = 'pointer';
-        row.title = 'Click to view tasks';
-        row.onclick = () => showAssigneeTasks(item.assignee);
+        row.title = isUnassigned ? 'Click to view unassigned tasks' : 'Click to view tasks';
+        row.onclick = () => showAssigneeTasks(isUnassigned ? '_unassigned' : item.assignee);
         tableBody.appendChild(row);
     });
 
-    if (resourceData.length === 0) {
+    if (allData.length === 0) {
         chartContainer.innerHTML = '<p class="no-data">No resource data available</p>';
         tableBody.innerHTML = '<tr><td colspan="3" class="no-data">No resource data available</td></tr>';
     }
@@ -523,15 +543,16 @@ function showAssigneeTasks(assignee) {
         return;
     }
 
-    // Remove @ prefix if present for lookup
-    const login = assignee.startsWith('@') ? assignee.slice(1) : assignee;
+    // Handle unassigned items or regular assignees
+    const isUnassigned = assignee === '_unassigned' || assignee === 'Unassigned';
+    const login = isUnassigned ? '_unassigned' : (assignee.startsWith('@') ? assignee.slice(1) : assignee);
     const tasks = currentProjectData.assigneeTasks[login] || [];
 
     const modal = document.getElementById('assignee-modal');
     const nameElement = document.getElementById('modal-assignee-name');
     const tasksList = document.getElementById('modal-tasks-list');
 
-    nameElement.textContent = `@${login}`;
+    nameElement.textContent = isUnassigned ? 'Unassigned Items' : `@${login}`;
 
     if (tasks.length === 0) {
         tasksList.innerHTML = '<p class="no-data">No active tasks found</p>';
