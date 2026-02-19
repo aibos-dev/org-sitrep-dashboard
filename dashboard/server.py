@@ -4,9 +4,11 @@ Organization SitRep Dashboard Server
 Serves the dashboard and provides API endpoints for project data.
 """
 
+import hashlib
 import http.server
 import json
 import os
+import secrets
 import subprocess
 from datetime import datetime
 from glob import glob
@@ -19,6 +21,10 @@ PROJECT_DIR = DASHBOARD_DIR.parent
 REPORTS_DIR = PROJECT_DIR / "reports"
 SCRIPTS_DIR = PROJECT_DIR / "scripts"
 CONFIG_FILE = PROJECT_DIR / "config.json"
+DASHBOARD_PASSCODE = os.environ.get("DASHBOARD_PASSCODE", "A!b0s21#00X9@")
+
+# Active session tokens (in-memory; resets on server restart)
+active_sessions = set()
 
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
@@ -27,6 +33,23 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DASHBOARD_DIR), **kwargs)
 
+    def _is_authenticated(self):
+        """Check if request has a valid session token."""
+        cookie_header = self.headers.get("Cookie", "")
+        for part in cookie_header.split(";"):
+            part = part.strip()
+            if part.startswith("session_token="):
+                token = part.split("=", 1)[1]
+                return token in active_sessions
+        return False
+
+    def _send_unauthorized(self):
+        """Send 401 response."""
+        self.send_response(401)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"error": "Unauthorized"}).encode())
+
     def do_GET(self):
         """Handle GET requests."""
         parsed_path = urlparse(self.path)
@@ -34,8 +57,12 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         if parsed_path.path == "/health":
             self.send_json_response({"status": "ok"})
         elif parsed_path.path == "/api/data":
+            if not self._is_authenticated():
+                return self._send_unauthorized()
             self.send_json_response(get_all_projects_data())
         elif parsed_path.path == "/api/projects":
+            if not self._is_authenticated():
+                return self._send_unauthorized()
             self.send_json_response(get_projects_list())
         elif parsed_path.path == "/":
             self.path = "/index.html"
@@ -47,7 +74,31 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         """Handle POST requests."""
         parsed_path = urlparse(self.path)
 
-        if parsed_path.path == "/api/regenerate":
+        if parsed_path.path == "/api/auth":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                passcode = data.get("passcode", "")
+            except (json.JSONDecodeError, AttributeError):
+                passcode = ""
+
+            if passcode == DASHBOARD_PASSCODE:
+                token = secrets.token_hex(32)
+                active_sessions.add(token)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Set-Cookie", f"session_token={token}; Path=/; HttpOnly; SameSite=Strict")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True}).encode())
+            else:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": "Invalid passcode"}).encode())
+        elif parsed_path.path == "/api/regenerate":
+            if not self._is_authenticated():
+                return self._send_unauthorized()
             result = regenerate_all_reports()
             self.send_json_response(result)
         else:
