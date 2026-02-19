@@ -14,7 +14,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 # Configuration
-PORT = 8080
 DASHBOARD_DIR = Path(__file__).parent
 PROJECT_DIR = DASHBOARD_DIR.parent
 REPORTS_DIR = PROJECT_DIR / "reports"
@@ -32,7 +31,9 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         """Handle GET requests."""
         parsed_path = urlparse(self.path)
 
-        if parsed_path.path == "/api/data":
+        if parsed_path.path == "/health":
+            self.send_json_response({"status": "ok"})
+        elif parsed_path.path == "/api/data":
             self.send_json_response(get_all_projects_data())
         elif parsed_path.path == "/api/projects":
             self.send_json_response(get_projects_list())
@@ -164,18 +165,42 @@ def regenerate_all_reports():
 
 
 def load_config():
-    """Load configuration from config.json."""
+    """Load configuration from config.json with environment variable overrides."""
+    config = {}
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
+            config = json.load(f)
+
+    # Environment variables take precedence over config.json
+    env_port = os.environ.get("PORT")
+    env_token = os.environ.get("GH_TOKEN")
+    env_owner = os.environ.get("GITHUB_OWNER")
+
+    if env_port:
+        config.setdefault("dashboard", {})["port"] = int(env_port)
+    if env_token:
+        config.setdefault("github", {})["token"] = env_token
+    if env_owner:
+        config.setdefault("github", {})["owner"] = env_owner
+
+    return config
 
 
 def run_server():
     """Start the dashboard server."""
     config = load_config()
-    port = config.get("dashboard", {}).get("port", PORT)
+    port = config.get("dashboard", {}).get("port", 8080)
     org = config.get("github", {}).get("owner", "Unknown")
+
+    # Export env vars for child processes (bash scripts)
+    token = config.get("github", {}).get("token", "")
+    if token:
+        os.environ["GH_TOKEN"] = token
+    if org != "Unknown":
+        os.environ["GITHUB_OWNER"] = org
+
+    # Ensure reports directory exists
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Fetch initial data on server start
     print("\n  Loading initial reports...")
@@ -189,14 +214,15 @@ def run_server():
     print("  Organization SitRep Dashboard Server")
     print(f"{'='*55}")
     print(f"  Organization: {org}")
-    print(f"  Dashboard:    http://localhost:{port}")
-    print(f"  API Data:     http://localhost:{port}/api/data")
+    print(f"  Dashboard:    http://0.0.0.0:{port}")
+    print(f"  API Data:     http://0.0.0.0:{port}/api/data")
+    print(f"  Health Check: http://0.0.0.0:{port}/health")
     print(f"  Reports:      {REPORTS_DIR}")
     print(f"{'='*55}")
 
     print("\n  Press Ctrl+C to stop the server\n")
 
-    with http.server.HTTPServer(("", port), DashboardHandler) as httpd:
+    with http.server.HTTPServer(("0.0.0.0", port), DashboardHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

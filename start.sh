@@ -26,11 +26,19 @@ if ! command -v jq &> /dev/null; then
     echo "Install with: sudo apt install jq"
 fi
 
-# Check config exists
-if [ ! -f "$SCRIPT_DIR/config.json" ]; then
-    echo "Warning: config.json not found."
-    echo "Please copy config.sample.json to config.json and configure it."
+# Support environment variables as primary config source (for Render/cloud deploys)
+# Falls back to config.json for local development
+if [ -z "$GH_TOKEN" ] && [ -z "$GITHUB_OWNER" ]; then
+    if [ ! -f "$SCRIPT_DIR/config.json" ]; then
+        echo "Warning: config.json not found and no environment variables set."
+        echo "Please either:"
+        echo "  - Copy config.sample.json to config.json and configure it"
+        echo "  - Set GH_TOKEN and GITHUB_OWNER environment variables"
+    fi
 fi
+
+# Ensure reports directory exists
+mkdir -p "$SCRIPT_DIR/reports"
 
 # Start the server
 cd "$SCRIPT_DIR/dashboard"

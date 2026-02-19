@@ -12,22 +12,23 @@ OUTPUT_DIR="${PROJECT_DIR}/reports"
 DATE=$(date +%Y-%m-%d)
 TIME=$(date +%H-%M-%S)
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: config.json not found. Please create it from config.sample.json"
-    exit 1
+# Support environment variables with fallback to config.json
+OWNER="${GITHUB_OWNER:-}"
+TOKEN="${GH_TOKEN:-}"
+
+if [ -f "$CONFIG_FILE" ]; then
+    [ -z "$OWNER" ] && OWNER=$(jq -r '.github.owner // empty' "$CONFIG_FILE")
+    [ -z "$TOKEN" ] && TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
 fi
 
-OWNER=$(jq -r '.github.owner' "$CONFIG_FILE")
-GITHUB_TOKEN=$(jq -r '.github.token // empty' "$CONFIG_FILE")
-
 if [ -z "$OWNER" ]; then
-    echo "Error: Missing 'owner' in config.json"
+    echo "Error: Missing GitHub owner. Set GITHUB_OWNER env var or 'owner' in config.json"
     exit 1
 fi
 
 # Set up GitHub token
-if [ ! -z "$GITHUB_TOKEN" ]; then
-    export GH_TOKEN="$GITHUB_TOKEN"
+if [ -n "$TOKEN" ]; then
+    export GH_TOKEN="$TOKEN"
 fi
 
 mkdir -p "$OUTPUT_DIR"
