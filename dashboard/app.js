@@ -9,6 +9,7 @@ const CONFIG = {
 let refreshTimer = null;
 let nextRefreshTime = null;
 let allProjectsData = [];
+let orgMembers = [];
 let currentProject = 'all';
 let currentProjectData = null;
 let isRegenerating = false;
@@ -82,6 +83,7 @@ async function refreshData() {
         }
         const data = await response.json();
         allProjectsData = data.projects || [];
+        orgMembers = data.orgMembers || [];
 
         // Update project selector
         updateProjectSelector(allProjectsData);
@@ -155,13 +157,23 @@ function updateOrgOverview(projects) {
         (p.resourceLoad || []).forEach(r => allMembers.add(r.assignee));
     });
 
+    // Calculate unassigned members (org members with no tasks in any project)
+    const assignedLogins = new Set();
+    projects.forEach(p => {
+        (p.resourceLoad || []).forEach(r => {
+            assignedLogins.add(r.assignee.replace('@', ''));
+        });
+    });
+    const unassignedMembers = orgMembers.filter(m => !assignedLogins.has(m));
+
     // Update summary cards
     document.getElementById('total-projects').textContent = projects.length;
     document.getElementById('org-total-items').textContent = totalItems;
     document.getElementById('org-total-violations').textContent = totalViolations;
     document.getElementById('org-team-members').textContent = allMembers.size;
     document.getElementById('org-total-prs').textContent = totalPRs;
-    document.getElementById('org-total-unassigned').textContent = totalUnassigned;
+    document.getElementById('org-total-unassigned-tasks').textContent = totalUnassigned;
+    document.getElementById('org-unassigned-members').textContent = unassignedMembers.length;
 
     // Build project cards
     const grid = document.getElementById('projects-grid');
@@ -180,8 +192,16 @@ function updateOrgOverview(projects) {
 
         const prCount = project.totalOpenPRs || 0;
         const prClass = prCount > 0 ? 'has-prs' : '';
-        const unassignedCount = project.unassignedItems || 0;
-        const unassignedClass = unassignedCount > 0 ? 'unassigned' : '';
+        const unassignedTaskCount = project.unassignedItems || 0;
+        const unassignedTaskClass = unassignedTaskCount > 0 ? 'unassigned' : '';
+
+        // Calculate unassigned members for this project
+        const projectAssignees = new Set();
+        (project.resourceLoad || []).forEach(r => {
+            projectAssignees.add(r.assignee.replace('@', ''));
+        });
+        const projectUnassignedMembers = orgMembers.filter(m => !projectAssignees.has(m));
+        const unassignedMemberClass = projectUnassignedMembers.length > 0 ? 'unassigned' : '';
 
         card.innerHTML = `
             <div class="project-card-header">
@@ -205,9 +225,13 @@ function updateOrgOverview(projects) {
                     <div class="project-stat-value">${prCount}</div>
                     <div class="project-stat-label">Open PRs</div>
                 </div>
-                <div class="project-stat ${unassignedClass}">
-                    <div class="project-stat-value">${unassignedCount}</div>
-                    <div class="project-stat-label">Unassigned</div>
+                <div class="project-stat ${unassignedTaskClass}">
+                    <div class="project-stat-value">${unassignedTaskCount}</div>
+                    <div class="project-stat-label">Unassigned Tasks</div>
+                </div>
+                <div class="project-stat ${unassignedMemberClass}">
+                    <div class="project-stat-value">${projectUnassignedMembers.length}</div>
+                    <div class="project-stat-label">Idle Members</div>
                 </div>
             </div>
         `;
@@ -297,7 +321,7 @@ function updateResourceLoad(resourceData, unassignedCount = 0) {
 
     const allData = [...resourceData];
     if (unassignedCount > 0) {
-        allData.push({ assignee: 'Unassigned', count: unassignedCount });
+        allData.push({ assignee: 'Unassigned Tasks', count: unassignedCount });
     }
 
     const maxCount = Math.max(...allData.map(r => r.count), 1);
@@ -311,7 +335,7 @@ function updateResourceLoad(resourceData, unassignedCount = 0) {
     tableBody.innerHTML = '';
 
     allData.forEach((item, index) => {
-        const isUnassigned = item.assignee === 'Unassigned';
+        const isUnassigned = item.assignee === 'Unassigned Tasks';
         const size = 30 + (item.count / maxCount) * 40;
         const color = isUnassigned ? '#94a3b8' : colors[index % colors.length];
         const bubble = document.createElement('div');
@@ -544,7 +568,7 @@ function showAssigneeTasks(assignee) {
     }
 
     // Handle unassigned items or regular assignees
-    const isUnassigned = assignee === '_unassigned' || assignee === 'Unassigned';
+    const isUnassigned = assignee === '_unassigned' || assignee === 'Unassigned Tasks';
     const login = isUnassigned ? '_unassigned' : (assignee.startsWith('@') ? assignee.slice(1) : assignee);
     const tasks = currentProjectData.assigneeTasks[login] || [];
 
