@@ -7,7 +7,26 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Passcode Gate -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+            </div>
+            <h2>Organization SitRep Dashboard</h2>
+            <p class="auth-subtitle">Enter passcode to continue</p>
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <input type="password" id="passcode-input" placeholder="Passcode" autocomplete="off" required>
+                <button type="submit" id="auth-btn">Unlock</button>
+            </form>
+            <p id="auth-error" class="auth-error hidden">Invalid passcode. Try again.</p>
+        </div>
+    </div>
+
+    <div class="container hidden" id="dashboard-container">
         <header>
             <h1>Organization SitRep Dashboard</h1>
             <div class="header-controls">
@@ -246,6 +265,43 @@
         </div>
     </div>
 
+    <script>
+    async function handleAuth(e) {
+        e.preventDefault();
+        const input = document.getElementById('passcode-input');
+        const error = document.getElementById('auth-error');
+        const btn = document.getElementById('auth-btn');
+
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+        error.classList.add('hidden');
+
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ passcode: input.value })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('dashboard-container').classList.remove('hidden');
+                initDashboard();
+            } else {
+                error.classList.remove('hidden');
+                input.value = '';
+                input.focus();
+            }
+        } catch (err) {
+            error.textContent = 'Connection error. Try again.';
+            error.classList.remove('hidden');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+    }
+    </script>
     <script src="app.js"></script>
 </body>
 </html>
