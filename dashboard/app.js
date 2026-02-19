@@ -13,12 +13,26 @@ let currentProject = 'all';
 let currentProjectData = null;
 let isRegenerating = false;
 
-// Initialize dashboard
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize dashboard (called after successful authentication)
+function initDashboard() {
     setupEventListeners();
     refreshData();
     startAutoRefresh();
     updateRefreshCountdown();
+}
+
+// Check if already authenticated (cookie still valid) on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const res = await fetch('/api/data');
+        if (res.ok) {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('dashboard-container').classList.remove('hidden');
+            initDashboard();
+        }
+    } catch (e) {
+        // Not authenticated, show login screen
+    }
 });
 
 function setupEventListeners() {
