@@ -533,6 +533,37 @@ header h1 {
     color: #94a3b8;
 }
 
+/* Idle Members Section */
+.idle-members-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.idle-members-section h3 {
+    font-size: 0.9rem;
+    color: var(--accent-red);
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.idle-members-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.idle-member-tag {
+    display: inline-block;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 /* Epic Panel */
 .epic-panel {
     margin-bottom: 20px;
