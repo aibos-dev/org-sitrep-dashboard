@@ -180,10 +180,18 @@ def get_all_projects_data():
     # Sort by project number
     projects_data.sort(key=lambda x: x.get("projectNumber", 0))
 
+    # Load org members list
+    members_file = REPORTS_DIR / "members.json"
+    org_members = []
+    if members_file.exists():
+        with open(members_file, "r") as f:
+            org_members = json.load(f)
+
     return {
         "projects": projects_data,
         "lastUpdate": datetime.now().isoformat(),
         "projectCount": len(projects_data),
+        "orgMembers": org_members,
     }
 
 
