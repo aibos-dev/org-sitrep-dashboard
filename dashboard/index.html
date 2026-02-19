@@ -46,7 +46,15 @@
 
         <!-- Organization Overview (shown when "All Projects" selected) -->
         <section id="org-overview" class="org-overview">
-            <h2>Organization Overview</h2>
+            <div class="org-header">
+                <h2>Organization Overview</h2>
+                <div class="project-search">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="project-search" placeholder="Search projects..." autocomplete="off">
+                </div>
+            </div>
             <div class="org-summary-cards">
                 <div class="card">
                     <div class="card-icon">
@@ -135,7 +143,27 @@
                         <p class="card-value" id="org-unassigned-members">--</p>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-icon overdue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Overdue Items</h3>
+                        <p class="card-value" id="org-total-overdue">--</p>
+                    </div>
+                </div>
             </div>
+
+            <!-- Cross-Project Summary Table -->
+            <section class="panel cross-project-panel">
+                <h2>Cross-Project Summary</h2>
+                <div id="cross-project-content">
+                    <p class="no-data">Loading project data...</p>
+                </div>
+            </section>
 
             <div class="projects-grid" id="projects-grid">
                 <!-- Project cards will be inserted here -->
@@ -206,6 +234,29 @@
                         <p class="card-value" id="open-prs">--</p>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-icon overdue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Overdue Items</h3>
+                        <p class="card-value" id="project-overdue">--</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon risk-card-icon" id="risk-card">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="card-content">
+                        <h3>Risk Level</h3>
+                        <p class="card-value" id="project-risk-level">--</p>
+                    </div>
+                </div>
             </div>
 
             <div class="dashboard-grid">
@@ -245,6 +296,28 @@
                     </div>
                 </section>
             </div>
+
+            <div class="dashboard-grid">
+                <section class="panel status-panel">
+                    <h2>Status Distribution</h2>
+                    <div id="status-chart"></div>
+                    <div id="status-legend" class="status-legend"></div>
+                </section>
+
+                <section class="panel overdue-panel">
+                    <h2>Overdue Items</h2>
+                    <div id="overdue-content">
+                        <p class="no-data">Loading overdue data...</p>
+                    </div>
+                </section>
+            </div>
+
+            <section class="panel aging-panel">
+                <h2>Aging Work in Progress</h2>
+                <div id="aging-content">
+                    <p class="no-data">Loading aging WIP data...</p>
+                </div>
+            </section>
 
             <section class="panel epic-panel">
                 <h2>Epic Roadmap</h2>
