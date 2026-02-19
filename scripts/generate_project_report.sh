@@ -273,7 +273,13 @@ health_check = [
     {'metric': 'Missing Work Hours', 'count': len(missing_hours), 'description': f'{len(missing_hours)} issues'}
 ]
 
-# Resource load
+# Collect all project members (anyone ever assigned to any item, including closed)
+all_project_members = set()
+for item in items:
+    for assignee in item.get('content', {}).get('assignees', {}).get('nodes', []):
+        all_project_members.add(assignee['login'])
+
+# Resource load (active items only)
 assignee_counts = {}
 unassigned_count = 0
 for item in items:
@@ -290,6 +296,9 @@ for item in items:
 
 resource_load = [{'assignee': f'@{k}', 'count': v}
                  for k, v in sorted(assignee_counts.items(), key=lambda x: -x[1])]
+
+# Idle members: project members with zero active tasks
+idle_members = sorted(all_project_members - set(assignee_counts.keys()))
 
 # Assignee tasks (for drill-down)
 assignee_tasks = {}
@@ -379,7 +388,9 @@ report = {
     'openPRs': open_prs,
     'totalOpenPRs': len(open_prs),
     'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate')),
-    'unassignedItems': unassigned_count
+    'unassignedItems': unassigned_count,
+    'projectMembers': sorted(all_project_members),
+    'idleMembers': idle_members
 }
 
 with open(output_file, 'w') as f:
