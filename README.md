@@ -148,7 +148,49 @@ Each project report includes:
 - **Overdue Items**: Items past target date with days overdue
 - **Status Distribution**: Item counts by status across all items
 - **Aging WIP**: In-progress items with days since start date
-- **Risk Score**: Composite score (0-100) with risk level classification
+- **Risk Score**: Composite score (0-100) with risk level classification (see below)
 - **Epic Roadmap**: Open epics with dates and assignees
 - **Open PRs**: Pull requests with age and late status
 - **Flagged Issues**: Issues grouped by violation type
+
+## Risk Score Calculation
+
+Each project receives a composite risk score from 0 to 100, computed as a weighted sum of six factors. Each factor is a ratio (0.0 to 1.0) multiplied by its weight. The divisor for each ratio ensures the score scales relative to the project's size.
+
+### Factors and Weights
+
+| Factor | Weight | Formula | What it measures |
+|--------|--------|---------|------------------|
+| Violations | 25 | `total health violations / active items` | Data quality gaps (missing assignee, status, dates, hours) |
+| Overdue items | 30 | `items past target date / active items` | Delivery slippage |
+| Unassigned items | 15 | `unassigned item count / active items` | Unowned work |
+| Idle members | 10 | `idle members / total project members` | Underutilized team capacity |
+| Late PRs | 10 | `PRs older than 24h / total open PRs` | Code review bottlenecks |
+| Severely aging WIP | 10 | `in-progress items > 14 days / active items` | Stalled work items |
+
+All ratios are capped at 1.0. The maximum possible score is 100 (all factors at worst case).
+
+### Risk Levels
+
+| Score Range | Level | Badge Color |
+|-------------|-------|-------------|
+| 0 - 15 | Low | Green |
+| 16 - 40 | Medium | Yellow |
+| 41 - 70 | High | Red |
+| 71 - 100 | Critical | Dark Red |
+
+### Example
+
+A project with 10 active items, 3 project members (1 idle), 2 open PRs (0 late):
+
+| Factor | Values | Ratio | Weighted |
+|--------|--------|-------|----------|
+| Violations | 5 violations | 5/10 = 0.50 | 0.50 x 25 = 12.5 |
+| Overdue | 3 overdue | 3/10 = 0.30 | 0.30 x 30 = 9.0 |
+| Unassigned | 2 unassigned | 2/10 = 0.20 | 0.20 x 15 = 3.0 |
+| Idle members | 1 idle / 3 total | 1/3 = 0.33 | 0.33 x 10 = 3.3 |
+| Late PRs | 0 late / 2 open | 0/2 = 0.00 | 0.00 x 10 = 0.0 |
+| Aging WIP | 1 item > 14 days | 1/10 = 0.10 | 0.10 x 10 = 1.0 |
+| | | **Total** | **28.8 → 29** |
+
+Result: **29 → Medium risk** (yellow badge)
