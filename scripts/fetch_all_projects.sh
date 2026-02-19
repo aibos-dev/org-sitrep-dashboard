@@ -90,6 +90,29 @@ echo ""
 # Save project list to JSON for the dashboard
 echo "$PROJECTS_DATA" | jq '[.data.organization.projectsV2.nodes[] | select(.closed == false) | {number, title, description: .shortDescription, itemCount: .items.totalCount}]' > "$OUTPUT_DIR/projects.json"
 
+# Fetch organization members
+echo "Fetching organization members..."
+MEMBERS_QUERY='query($org: String!) {
+  organization(login: $org) {
+    membersWithRole(first: 100) {
+      nodes {
+        login
+      }
+    }
+  }
+}'
+
+MEMBERS_DATA=$(gh api graphql -f query="$MEMBERS_QUERY" -f org="$OWNER" 2>&1)
+if echo "$MEMBERS_DATA" | jq -e '.data.organization.membersWithRole' > /dev/null 2>&1; then
+    echo "$MEMBERS_DATA" | jq '[.data.organization.membersWithRole.nodes[].login]' > "$OUTPUT_DIR/members.json"
+    MEMBER_COUNT=$(jq 'length' "$OUTPUT_DIR/members.json")
+    echo "  Found $MEMBER_COUNT organization members"
+else
+    echo "  Warning: Could not fetch org members (may require admin scope). Falling back to empty list."
+    echo "[]" > "$OUTPUT_DIR/members.json"
+fi
+echo ""
+
 # Process each project in parallel
 MAX_PARALLEL=4  # Maximum concurrent jobs
 PIDS=()
