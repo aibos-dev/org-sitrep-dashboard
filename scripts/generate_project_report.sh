@@ -275,12 +275,16 @@ health_check = [
 
 # Resource load
 assignee_counts = {}
+unassigned_count = 0
 for item in items:
     if item.get('content', {}).get('state') == 'CLOSED':
         continue
     status = get_status(item)
     if status not in ['Done', 'On Hold']:
-        for assignee in item.get('content', {}).get('assignees', {}).get('nodes', []):
+        assignees = item.get('content', {}).get('assignees', {}).get('nodes', [])
+        if not assignees:
+            unassigned_count += 1
+        for assignee in assignees:
             login = assignee['login']
             assignee_counts[login] = assignee_counts.get(login, 0) + 1
 
@@ -295,7 +299,17 @@ for item in items:
     status = get_status(item)
     if status not in ['Done', 'On Hold']:
         content = item.get('content', {})
-        for assignee in content.get('assignees', {}).get('nodes', []):
+        assignees = content.get('assignees', {}).get('nodes', [])
+        if not assignees:
+            if '_unassigned' not in assignee_tasks:
+                assignee_tasks['_unassigned'] = []
+            assignee_tasks['_unassigned'].append({
+                'number': content.get('number'),
+                'title': content.get('title'),
+                'url': content.get('url'),
+                'status': status
+            })
+        for assignee in assignees:
             login = assignee['login']
             if login not in assignee_tasks:
                 assignee_tasks[login] = []
@@ -364,7 +378,8 @@ report = {
     'assigneeTasks': assignee_tasks,
     'openPRs': open_prs,
     'totalOpenPRs': len(open_prs),
-    'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate'))
+    'totalLatePRs': sum(1 for pr in open_prs if pr.get('isLate')),
+    'unassignedItems': unassigned_count
 }
 
 with open(output_file, 'w') as f:
