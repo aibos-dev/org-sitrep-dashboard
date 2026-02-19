@@ -40,6 +40,27 @@ function setupEventListeners() {
         currentProject = e.target.value;
         updateView();
     });
+
+    document.getElementById('project-search').addEventListener('input', (e) => {
+        filterProjects(e.target.value);
+    });
+}
+
+function filterProjects(query) {
+    const q = query.toLowerCase().trim();
+    const cards = document.querySelectorAll('#projects-grid .project-card');
+    const rows = document.querySelectorAll('.cross-project-row');
+
+    cards.forEach(card => {
+        const name = card.querySelector('.project-card-title')?.textContent.toLowerCase() || '';
+        const number = card.querySelector('.project-card-number')?.textContent.toLowerCase() || '';
+        card.style.display = (!q || name.includes(q) || number.includes(q)) ? '' : 'none';
+    });
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
 }
 
 // Auto-refresh functionality (triggers full regeneration)
@@ -161,6 +182,9 @@ function updateOrgOverview(projects) {
         (p.idleMembers || []).forEach(m => allIdleMembers.add(m));
     });
 
+    // Calculate total overdue
+    const totalOverdue = projects.reduce((sum, p) => sum + (p.totalOverdueItems || 0), 0);
+
     // Update summary cards
     document.getElementById('total-projects').textContent = projects.length;
     document.getElementById('org-total-items').textContent = totalItems;
@@ -169,6 +193,10 @@ function updateOrgOverview(projects) {
     document.getElementById('org-total-prs').textContent = totalPRs;
     document.getElementById('org-total-unassigned-tasks').textContent = totalUnassigned;
     document.getElementById('org-unassigned-members').textContent = allIdleMembers.size;
+    document.getElementById('org-total-overdue').textContent = totalOverdue;
+
+    // Build cross-project summary table
+    updateCrossProjectTable(projects);
 
     // Build project cards
     const grid = document.getElementById('projects-grid');
@@ -193,10 +221,19 @@ function updateOrgOverview(projects) {
         const projectIdleMembers = project.idleMembers || [];
         const unassignedMemberClass = projectIdleMembers.length > 0 ? 'unassigned' : '';
 
+        const overdueCount = project.totalOverdueItems || 0;
+        const overdueClass = overdueCount > 0 ? 'overdue' : '';
+
+        const riskLevel = project.riskLevel || 'Low';
+        const riskBadgeClass = `risk-badge risk-${riskLevel.toLowerCase()}`;
+
         card.innerHTML = `
             <div class="project-card-header">
                 <span class="project-card-title">${project.projectName}</span>
-                <span class="project-card-number">#${project.projectNumber}</span>
+                <div class="project-card-badges">
+                    <span class="${riskBadgeClass}">${riskLevel}</span>
+                    <span class="project-card-number">#${project.projectNumber}</span>
+                </div>
             </div>
             <div class="project-card-stats">
                 <div class="project-stat">
@@ -217,11 +254,15 @@ function updateOrgOverview(projects) {
                 </div>
                 <div class="project-stat ${unassignedTaskClass}">
                     <div class="project-stat-value">${unassignedTaskCount}</div>
-                    <div class="project-stat-label">Unassigned Tasks</div>
+                    <div class="project-stat-label">Unassigned</div>
                 </div>
                 <div class="project-stat ${unassignedMemberClass}">
                     <div class="project-stat-value">${projectIdleMembers.length}</div>
-                    <div class="project-stat-label">Idle Members</div>
+                    <div class="project-stat-label">Idle</div>
+                </div>
+                <div class="project-stat ${overdueClass}">
+                    <div class="project-stat-value">${overdueCount}</div>
+                    <div class="project-stat-label">Overdue</div>
                 </div>
             </div>
         `;
@@ -246,6 +287,15 @@ function updateProjectDashboard(data) {
     document.getElementById('team-members').textContent =
         data.resourceLoad ? data.resourceLoad.length : 0;
     document.getElementById('open-prs').textContent = data.totalOpenPRs || 0;
+    document.getElementById('project-overdue').textContent = data.totalOverdueItems || 0;
+
+    // Update risk level card
+    const riskLevel = data.riskLevel || 'Low';
+    const riskEl = document.getElementById('project-risk-level');
+    riskEl.textContent = riskLevel;
+    riskEl.className = `card-value risk-text-${riskLevel.toLowerCase()}`;
+    const riskIcon = document.getElementById('risk-card');
+    riskIcon.className = `card-icon risk-card-icon risk-icon-${riskLevel.toLowerCase()}`;
 
     // Update health check
     updateHealthCheck(data.healthCheck || []);
@@ -255,6 +305,15 @@ function updateProjectDashboard(data) {
 
     // Update idle members
     updateIdleMembers(data.idleMembers || []);
+
+    // Update status distribution
+    updateStatusDistribution(data.statusDistribution || []);
+
+    // Update overdue items
+    updateOverdueItems(data.overdueItems || []);
+
+    // Update aging WIP
+    updateAgingWIP(data.agingWIP || []);
 
     // Update epic roadmap
     updateEpicRoadmap(data.epicRoadmap || []);
@@ -460,6 +519,242 @@ function updateFlaggedIssues(issueDetails) {
     });
 
     container.innerHTML = html || '<p class="no-data">No flagged issues</p>';
+}
+
+// Status Distribution visualization
+function updateStatusDistribution(statusData) {
+    const chartContainer = document.getElementById('status-chart');
+    const legendContainer = document.getElementById('status-legend');
+
+    if (!statusData || statusData.length === 0) {
+        chartContainer.innerHTML = '<p class="no-data">No status data available</p>';
+        legendContainer.innerHTML = '';
+        return;
+    }
+
+    const total = statusData.reduce((sum, s) => sum + s.count, 0);
+    const statusColors = {
+        'Done': '#22c55e',
+        'In Progress': '#3b82f6',
+        'Todo': '#94a3b8',
+        'On Hold': '#eab308',
+        'In Review': '#a855f7',
+        'Blocked': '#ef4444'
+    };
+    const defaultColors = ['#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#8b5cf6'];
+    let colorIdx = 0;
+
+    // Build stacked horizontal bar
+    let barHtml = '<div class="status-bar">';
+    statusData.forEach(item => {
+        const pct = (item.count / total) * 100;
+        const color = statusColors[item.status] || defaultColors[colorIdx++ % defaultColors.length];
+        barHtml += `<div class="status-bar-segment" style="width:${Math.max(pct, 1)}%;background:${color}" title="${item.status}: ${item.count} (${Math.round(pct)}%)"></div>`;
+    });
+    barHtml += '</div>';
+    chartContainer.innerHTML = barHtml;
+
+    // Build legend with counts
+    colorIdx = 0;
+    let legendHtml = '';
+    statusData.forEach(item => {
+        const pct = Math.round((item.count / total) * 100);
+        const color = statusColors[item.status] || defaultColors[colorIdx++ % defaultColors.length];
+        legendHtml += `
+            <div class="status-legend-item">
+                <span class="status-legend-color" style="background:${color}"></span>
+                <span class="status-legend-label">${item.status}</span>
+                <span class="status-legend-count">${item.count}</span>
+                <span class="status-legend-pct">${pct}%</span>
+            </div>
+        `;
+    });
+    legendContainer.innerHTML = legendHtml;
+}
+
+// Overdue Items panel
+function updateOverdueItems(overdueData) {
+    const container = document.getElementById('overdue-content');
+
+    if (!overdueData || overdueData.length === 0) {
+        container.innerHTML = '<p class="no-data">No overdue items</p>';
+        return;
+    }
+
+    let html = `
+        <table class="data-table overdue-table">
+            <thead>
+                <tr>
+                    <th>Issue</th>
+                    <th>Title</th>
+                    <th>Assignees</th>
+                    <th>Target Date</th>
+                    <th>Overdue</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    overdueData.forEach(item => {
+        const severityClass = item.daysOverdue > 14 ? 'overdue-critical' :
+                             item.daysOverdue > 7 ? 'overdue-warning' : 'overdue-minor';
+        html += `
+            <tr class="${severityClass}">
+                <td><a href="${item.url}" target="_blank">#${item.number}</a></td>
+                <td class="overdue-title">${item.title}</td>
+                <td>${item.assignees}</td>
+                <td>${item.targetDate}</td>
+                <td><span class="overdue-badge ${severityClass}">${item.daysOverdue}d</span></td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// Aging WIP panel
+function updateAgingWIP(agingData) {
+    const container = document.getElementById('aging-content');
+
+    if (!agingData || agingData.length === 0) {
+        container.innerHTML = '<p class="no-data">No items currently in progress</p>';
+        return;
+    }
+
+    let html = `
+        <table class="data-table aging-table">
+            <thead>
+                <tr>
+                    <th>Issue</th>
+                    <th>Title</th>
+                    <th>Assignees</th>
+                    <th>Start Date</th>
+                    <th>Age</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    agingData.forEach(item => {
+        let ageDisplay, agingClass;
+        if (item.daysInProgress === null) {
+            ageDisplay = 'Unknown';
+            agingClass = 'aging-unknown';
+        } else if (item.daysInProgress > 14) {
+            ageDisplay = `${item.daysInProgress}d`;
+            agingClass = 'aging-critical';
+        } else if (item.daysInProgress > 7) {
+            ageDisplay = `${item.daysInProgress}d`;
+            agingClass = 'aging-warning';
+        } else {
+            ageDisplay = `${item.daysInProgress}d`;
+            agingClass = 'aging-ok';
+        }
+
+        html += `
+            <tr>
+                <td><a href="${item.url}" target="_blank">#${item.number}</a></td>
+                <td class="aging-title">${item.title}</td>
+                <td>${item.assignees}</td>
+                <td>${item.startDate || '-'}</td>
+                <td><span class="aging-badge ${agingClass}">${ageDisplay}</span></td>
+                <td><span class="aging-status-badge">${agingClass === 'aging-critical' ? 'At Risk' : agingClass === 'aging-warning' ? 'Monitor' : agingClass === 'aging-unknown' ? 'No Date' : 'Normal'}</span></td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// Cross-Project Summary Table (sortable)
+let crossProjectSortCol = 'projectName';
+let crossProjectSortAsc = true;
+
+function updateCrossProjectTable(projects) {
+    const container = document.getElementById('cross-project-content');
+
+    if (!projects || projects.length === 0) {
+        container.innerHTML = '<p class="no-data">No projects found</p>';
+        return;
+    }
+
+    const sorted = [...projects].sort((a, b) => {
+        let valA = a[crossProjectSortCol] ?? 0;
+        let valB = b[crossProjectSortCol] ?? 0;
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        if (valA < valB) return crossProjectSortAsc ? -1 : 1;
+        if (valA > valB) return crossProjectSortAsc ? 1 : -1;
+        return 0;
+    });
+
+    const columns = [
+        { key: 'projectName', label: 'Project' },
+        { key: 'totalActiveItems', label: 'Active' },
+        { key: 'totalOpenEpics', label: 'Epics' },
+        { key: 'totalViolations', label: 'Violations' },
+        { key: 'totalOpenPRs', label: 'PRs' },
+        { key: 'unassignedItems', label: 'Unassigned' },
+        { key: 'totalOverdueItems', label: 'Overdue' },
+        { key: 'riskScore', label: 'Risk' }
+    ];
+
+    let html = '<table class="data-table cross-project-table"><thead><tr>';
+    columns.forEach(col => {
+        const arrow = crossProjectSortCol === col.key ? (crossProjectSortAsc ? ' \u25B2' : ' \u25BC') : '';
+        html += `<th class="sortable-th" data-sort="${col.key}">${col.label}${arrow}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    sorted.forEach(project => {
+        const riskLevel = project.riskLevel || 'Low';
+        const riskBadge = `<span class="risk-badge risk-${riskLevel.toLowerCase()}">${riskLevel} (${project.riskScore || 0})</span>`;
+        const violationClass = (project.totalViolations || 0) > 0 ? ' class="text-warning"' : '';
+        const overdueClass = (project.totalOverdueItems || 0) > 0 ? ' class="text-danger"' : '';
+
+        html += `
+            <tr class="cross-project-row" data-project="${project.projectNumber}">
+                <td><strong>${project.projectName}</strong> <span class="text-muted">#${project.projectNumber}</span></td>
+                <td>${project.totalActiveItems || 0}</td>
+                <td>${project.totalOpenEpics || 0}</td>
+                <td${violationClass}>${project.totalViolations || 0}</td>
+                <td>${project.totalOpenPRs || 0}</td>
+                <td>${project.unassignedItems || 0}</td>
+                <td${overdueClass}>${project.totalOverdueItems || 0}</td>
+                <td>${riskBadge}</td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    // Add sort click handlers
+    container.querySelectorAll('.sortable-th').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (crossProjectSortCol === col) {
+                crossProjectSortAsc = !crossProjectSortAsc;
+            } else {
+                crossProjectSortCol = col;
+                crossProjectSortAsc = col === 'projectName';
+            }
+            updateCrossProjectTable(allProjectsData);
+        });
+    });
+
+    // Add row click handlers to navigate to project
+    container.querySelectorAll('.cross-project-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const projNum = row.dataset.project;
+            document.getElementById('project-select').value = projNum;
+            currentProject = projNum;
+            updateView();
+        });
+    });
 }
 
 // Regenerate all reports with progress indicator
