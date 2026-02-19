@@ -5,6 +5,9 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Add local bin directory to PATH (for Render-installed binaries)
+export PATH="$SCRIPT_DIR/bin:$PATH"
+
 echo "Starting Organization SitRep Dashboard..."
 echo ""
 
