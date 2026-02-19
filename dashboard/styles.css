@@ -267,7 +267,7 @@ header h1 {
 
 .project-card-stats {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 15px;
 }
 
@@ -353,6 +353,10 @@ header h1 {
 
 .card-icon.unassigned {
     background: #64748b;
+}
+
+.card-icon.idle-member {
+    background: var(--accent-red);
 }
 
 .card-content h3 {
