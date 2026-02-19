@@ -48,14 +48,7 @@ function setupEventListeners() {
 
 function filterProjects(query) {
     const q = query.toLowerCase().trim();
-    const cards = document.querySelectorAll('#projects-grid .project-card');
     const rows = document.querySelectorAll('.cross-project-row');
-
-    cards.forEach(card => {
-        const name = card.querySelector('.project-card-title')?.textContent.toLowerCase() || '';
-        const number = card.querySelector('.project-card-number')?.textContent.toLowerCase() || '';
-        card.style.display = (!q || name.includes(q) || number.includes(q)) ? '' : 'none';
-    });
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
@@ -164,115 +157,7 @@ function updateView() {
 
 // Update organization overview
 function updateOrgOverview(projects) {
-    // Calculate totals
-    const totalItems = projects.reduce((sum, p) => sum + (p.totalActiveItems || 0), 0);
-    const totalViolations = projects.reduce((sum, p) => sum + (p.totalViolations || 0), 0);
-    const totalPRs = projects.reduce((sum, p) => sum + (p.totalOpenPRs || 0), 0);
-    const totalUnassigned = projects.reduce((sum, p) => sum + (p.unassignedItems || 0), 0);
-
-    // Get unique team members
-    const allMembers = new Set();
-    projects.forEach(p => {
-        (p.resourceLoad || []).forEach(r => allMembers.add(r.assignee));
-    });
-
-    // Calculate total idle members across all projects (unique)
-    const allIdleMembers = new Set();
-    projects.forEach(p => {
-        (p.idleMembers || []).forEach(m => allIdleMembers.add(m));
-    });
-
-    // Calculate total overdue
-    const totalOverdue = projects.reduce((sum, p) => sum + (p.totalOverdueItems || 0), 0);
-
-    // Update summary cards
-    document.getElementById('total-projects').textContent = projects.length;
-    document.getElementById('org-total-items').textContent = totalItems;
-    document.getElementById('org-total-violations').textContent = totalViolations;
-    document.getElementById('org-team-members').textContent = allMembers.size;
-    document.getElementById('org-total-prs').textContent = totalPRs;
-    document.getElementById('org-total-unassigned-tasks').textContent = totalUnassigned;
-    document.getElementById('org-unassigned-members').textContent = allIdleMembers.size;
-    document.getElementById('org-total-overdue').textContent = totalOverdue;
-
-    // Build cross-project summary table
     updateCrossProjectTable(projects);
-
-    // Build project cards
-    const grid = document.getElementById('projects-grid');
-    grid.innerHTML = '';
-
-    projects.forEach(project => {
-        const card = document.createElement('div');
-        card.className = 'project-card';
-        card.onclick = () => {
-            document.getElementById('project-select').value = project.projectNumber;
-            currentProject = project.projectNumber;
-            updateView();
-        };
-
-        const violationClass = project.totalViolations > 0 ? 'violations' : 'healthy';
-
-        const prCount = project.totalOpenPRs || 0;
-        const prClass = prCount > 0 ? 'has-prs' : '';
-        const unassignedTaskCount = project.unassignedItems || 0;
-        const unassignedTaskClass = unassignedTaskCount > 0 ? 'unassigned' : '';
-
-        const projectIdleMembers = project.idleMembers || [];
-        const unassignedMemberClass = projectIdleMembers.length > 0 ? 'unassigned' : '';
-
-        const overdueCount = project.totalOverdueItems || 0;
-        const overdueClass = overdueCount > 0 ? 'overdue' : '';
-
-        const riskLevel = project.riskLevel || 'Low';
-        const riskBadgeClass = `risk-badge risk-${riskLevel.toLowerCase()}`;
-
-        card.innerHTML = `
-            <div class="project-card-header">
-                <span class="project-card-title">${project.projectName}</span>
-                <div class="project-card-badges">
-                    <span class="${riskBadgeClass}">${riskLevel}</span>
-                    <span class="project-card-number">#${project.projectNumber}</span>
-                </div>
-            </div>
-            <div class="project-card-stats">
-                <div class="project-stat">
-                    <div class="project-stat-value">${project.totalActiveItems || 0}</div>
-                    <div class="project-stat-label">Active Items</div>
-                </div>
-                <div class="project-stat">
-                    <div class="project-stat-value">${project.totalOpenEpics || 0}</div>
-                    <div class="project-stat-label">Open Epics</div>
-                </div>
-                <div class="project-stat ${violationClass}">
-                    <div class="project-stat-value">${project.totalViolations || 0}</div>
-                    <div class="project-stat-label">Violations</div>
-                </div>
-                <div class="project-stat ${prClass}">
-                    <div class="project-stat-value">${prCount}</div>
-                    <div class="project-stat-label">Open PRs</div>
-                </div>
-                <div class="project-stat ${unassignedTaskClass}">
-                    <div class="project-stat-value">${unassignedTaskCount}</div>
-                    <div class="project-stat-label">Unassigned</div>
-                </div>
-                <div class="project-stat ${unassignedMemberClass}">
-                    <div class="project-stat-value">${projectIdleMembers.length}</div>
-                    <div class="project-stat-label">Idle</div>
-                </div>
-                <div class="project-stat ${overdueClass}">
-                    <div class="project-stat-value">${overdueCount}</div>
-                    <div class="project-stat-label">Overdue</div>
-                </div>
-            </div>
-        `;
-
-        grid.appendChild(card);
-    });
-
-    if (projects.length === 0) {
-        grid.innerHTML = '<p class="no-data">No projects found. Click "Regenerate All Reports" to fetch data.</p>';
-    }
 }
 
 // Update single project dashboard
