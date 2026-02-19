@@ -208,6 +208,57 @@ header h1 {
 }
 
 /* Organization Overview */
+.org-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.org-header h2 {
+    font-size: 1.3rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.project-search {
+    position: relative;
+    width: 280px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+#project-search {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 9px 14px 9px 36px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#project-search:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+#project-search::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
 .org-overview h2 {
     font-size: 1.3rem;
     margin-bottom: 20px;
@@ -267,8 +318,8 @@ header h1 {
 
 .project-card-stats {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 15px;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
 }
 
 .project-stat {
@@ -296,6 +347,10 @@ header h1 {
 
 .project-stat.unassigned .project-stat-value {
     color: #94a3b8;
+}
+
+.project-stat.overdue .project-stat-value {
+    color: var(--accent-red);
 }
 
 /* Summary Cards */
@@ -789,6 +844,273 @@ footer button:active {
     50% { opacity: 0.5; }
 }
 
+/* Risk Badge */
+.risk-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.risk-low {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--accent-green);
+}
+
+.risk-medium {
+    background: rgba(234, 179, 8, 0.2);
+    color: var(--accent-yellow);
+}
+
+.risk-high {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
+}
+
+.risk-critical {
+    background: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+.project-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Risk card icon colors */
+.risk-card-icon { background: var(--accent-green); }
+.risk-icon-low { background: var(--accent-green); }
+.risk-icon-medium { background: var(--accent-yellow); }
+.risk-icon-high { background: var(--accent-red); }
+.risk-icon-critical { background: #dc2626; }
+
+.risk-text-low { color: var(--accent-green) !important; }
+.risk-text-medium { color: var(--accent-yellow) !important; }
+.risk-text-high { color: var(--accent-red) !important; }
+.risk-text-critical { color: #fca5a5 !important; }
+
+/* Overdue card icon */
+.card-icon.overdue {
+    background: #dc2626;
+}
+
+/* Status Distribution */
+.status-bar {
+    display: flex;
+    height: 32px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.status-bar-segment {
+    transition: width 0.5s ease;
+    min-width: 2px;
+}
+
+.status-bar-segment:first-child {
+    border-radius: 6px 0 0 6px;
+}
+
+.status-bar-segment:last-child {
+    border-radius: 0 6px 6px 0;
+}
+
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.status-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+}
+
+.status-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.status-legend-label {
+    color: var(--text-secondary);
+}
+
+.status-legend-count {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.status-legend-pct {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+/* Overdue Items Panel */
+.overdue-panel {
+    margin-bottom: 20px;
+}
+
+.overdue-table a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.overdue-table a:hover {
+    text-decoration: underline;
+}
+
+.overdue-title {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.overdue-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.overdue-minor {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--accent-yellow);
+}
+
+.overdue-warning {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red);
+}
+
+.overdue-critical {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+tr.overdue-critical {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+tr.overdue-warning {
+    background: rgba(239, 68, 68, 0.05);
+}
+
+/* Aging WIP Panel */
+.aging-panel {
+    margin-bottom: 20px;
+}
+
+.aging-table a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.aging-table a:hover {
+    text-decoration: underline;
+}
+
+.aging-title {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.aging-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.aging-ok {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--accent-green);
+}
+
+.aging-warning {
+    background: rgba(234, 179, 8, 0.2);
+    color: var(--accent-yellow);
+}
+
+.aging-critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
+}
+
+.aging-unknown {
+    background: rgba(148, 163, 184, 0.2);
+    color: var(--text-secondary);
+}
+
+.aging-status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 15px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--text-secondary);
+}
+
+/* Cross-Project Summary Table */
+.cross-project-panel {
+    margin-bottom: 30px;
+}
+
+.cross-project-table {
+    width: 100%;
+}
+
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.sortable-th:hover {
+    color: var(--accent-blue);
+}
+
+.cross-project-row {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cross-project-row:hover {
+    background: var(--bg-card);
+}
+
+.text-warning {
+    color: var(--accent-yellow);
+    font-weight: 600;
+}
+
+.text-danger {
+    color: var(--accent-red);
+    font-weight: 600;
+}
+
+.text-muted {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-left: 5px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .container {
@@ -848,7 +1170,7 @@ footer button:active {
     }
 
     .project-card-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 10px;
     }
 }
