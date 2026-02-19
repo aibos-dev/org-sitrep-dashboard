@@ -9,7 +9,6 @@ const CONFIG = {
 let refreshTimer = null;
 let nextRefreshTime = null;
 let allProjectsData = [];
-let orgMembers = [];
 let currentProject = 'all';
 let currentProjectData = null;
 let isRegenerating = false;
@@ -83,7 +82,6 @@ async function refreshData() {
         }
         const data = await response.json();
         allProjectsData = data.projects || [];
-        orgMembers = data.orgMembers || [];
 
         // Update project selector
         updateProjectSelector(allProjectsData);
@@ -157,14 +155,11 @@ function updateOrgOverview(projects) {
         (p.resourceLoad || []).forEach(r => allMembers.add(r.assignee));
     });
 
-    // Calculate unassigned members (org members with no tasks in any project)
-    const assignedLogins = new Set();
+    // Calculate total idle members across all projects (unique)
+    const allIdleMembers = new Set();
     projects.forEach(p => {
-        (p.resourceLoad || []).forEach(r => {
-            assignedLogins.add(r.assignee.replace('@', ''));
-        });
+        (p.idleMembers || []).forEach(m => allIdleMembers.add(m));
     });
-    const unassignedMembers = orgMembers.filter(m => !assignedLogins.has(m));
 
     // Update summary cards
     document.getElementById('total-projects').textContent = projects.length;
@@ -173,7 +168,7 @@ function updateOrgOverview(projects) {
     document.getElementById('org-team-members').textContent = allMembers.size;
     document.getElementById('org-total-prs').textContent = totalPRs;
     document.getElementById('org-total-unassigned-tasks').textContent = totalUnassigned;
-    document.getElementById('org-unassigned-members').textContent = unassignedMembers.length;
+    document.getElementById('org-unassigned-members').textContent = allIdleMembers.size;
 
     // Build project cards
     const grid = document.getElementById('projects-grid');
@@ -195,13 +190,8 @@ function updateOrgOverview(projects) {
         const unassignedTaskCount = project.unassignedItems || 0;
         const unassignedTaskClass = unassignedTaskCount > 0 ? 'unassigned' : '';
 
-        // Calculate unassigned members for this project
-        const projectAssignees = new Set();
-        (project.resourceLoad || []).forEach(r => {
-            projectAssignees.add(r.assignee.replace('@', ''));
-        });
-        const projectUnassignedMembers = orgMembers.filter(m => !projectAssignees.has(m));
-        const unassignedMemberClass = projectUnassignedMembers.length > 0 ? 'unassigned' : '';
+        const projectIdleMembers = project.idleMembers || [];
+        const unassignedMemberClass = projectIdleMembers.length > 0 ? 'unassigned' : '';
 
         card.innerHTML = `
             <div class="project-card-header">
@@ -230,7 +220,7 @@ function updateOrgOverview(projects) {
                     <div class="project-stat-label">Unassigned Tasks</div>
                 </div>
                 <div class="project-stat ${unassignedMemberClass}">
-                    <div class="project-stat-value">${projectUnassignedMembers.length}</div>
+                    <div class="project-stat-value">${projectIdleMembers.length}</div>
                     <div class="project-stat-label">Idle Members</div>
                 </div>
             </div>
@@ -262,6 +252,9 @@ function updateProjectDashboard(data) {
 
     // Update resource load
     updateResourceLoad(data.resourceLoad || [], data.unassignedItems || 0);
+
+    // Update idle members
+    updateIdleMembers(data.idleMembers || []);
 
     // Update epic roadmap
     updateEpicRoadmap(data.epicRoadmap || []);
@@ -375,6 +368,22 @@ function updateResourceLoad(resourceData, unassignedCount = 0) {
         chartContainer.innerHTML = '<p class="no-data">No resource data available</p>';
         tableBody.innerHTML = '<tr><td colspan="3" class="no-data">No resource data available</td></tr>';
     }
+}
+
+// Idle Members list
+function updateIdleMembers(idleMembers) {
+    const section = document.getElementById('idle-members-section');
+    const list = document.getElementById('idle-members-list');
+
+    if (!idleMembers || idleMembers.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+    list.innerHTML = idleMembers.map(member =>
+        `<span class="idle-member-tag">@${member}</span>`
+    ).join('');
 }
 
 // Epic Roadmap
